@@ -1,0 +1,24 @@
+services:
+  identity-postgres:
+    image: postgres:18
+    container_name: flowguard-identity-postgres
+
+    environment:
+      POSTGRES_DB: flowguard_identity
+      POSTGRES_USER: flowguard
+      POSTGRES_PASSWORD: flowguard
+
+    ports:
+      - "5433:5432"
+    volumes:
+      - identity-postgres-data:/var/lib/postgresql
+    networks:
+      - spring-boot-network
+
+
+networks:
+  spring-boot-network:
+    driver: bridge
+volumes:
+  identity-postgres-data:
+
