@@ -14,5 +14,20 @@ spring:
     password: flowguard
     locations: classpath:db/migration
 
-  server:
-    port: 8081
+server:
+  port: 8081
+
+api:
+  endpoint:
+    base-url: /api/v1
+
+security:
+  jwt:
+    public-key: classpath:certs/public.pem
+    private-key: classpath:certs/private.pem
+    issuer: flowguard-identity-service
+    access-token-expiration: 2h
+
+logging:
+  level:
+    org.springframework.r2dbc.core: INFO

@@ -4,18 +4,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-
-# Environment / secrets
-.env
-.env.*
-!.env.example
-
-# Private keys / secrets
-*.key
-*.p12
-*.pfx
-**/private.pem
-
 ### STS ###
 .apt_generated
 .classpath
@@ -26,16 +14,10 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea/
 .idea
 *.iws
 *.iml
 *.ipr
-.idea/compiler.xml
-.idea/encodings.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/src-spring-boot.iml
 
 ### NetBeans ###
 /nbproject/private/
@@ -49,7 +31,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-### ignore private files ###
-**/src/main/resources/certs/private.pem
-
