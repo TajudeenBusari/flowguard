@@ -1,6 +1,8 @@
 package com.flowguard.identity_service.controller;
 
+import com.flowguard.identity_service.dto.AssignRoleRequest;
 import com.flowguard.identity_service.dto.CreateUserRequest;
+import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.UserRole;
 import com.flowguard.identity_service.mapper.IdentityMapper;
 import com.flowguard.identity_service.repository.UserRoleRepository;
@@ -63,5 +65,34 @@ public class UserController {
             .collectList()
             .map(dtos ->
                     new Result("Users retrieved successfully", true, dtos, StatusCode.SUCCESS));
+  }
+
+  @PutMapping("/{userId}/roles")
+  public Mono<Result> assignUserRoles(@AuthenticationPrincipal Jwt jwt,
+                                      @PathVariable UUID userId,
+                                     @Valid @RequestBody AssignRoleRequest request) {
+    CurrentUser currentUser = CurrentUser.fromJwt(jwt);
+    return userService.assignRoleToUser(userId, currentUser.organizationId(), request.role())
+            .flatMap(user -> userRoleRepository.findAllByUserId(user.getId())
+                    .map(UserRole::getRole).collect(Collectors.toSet())
+                    .map(roles -> {
+                      var dto = IdentityMapper.mapFromUserToUserResponseDto(user, roles);
+                      return new Result("Roles assigned successfully", true, dto, StatusCode.SUCCESS);
+                    }));
+
+  }
+
+  @DeleteMapping("/{userId}/roles/{role}")
+  public Mono<Result> removeUserRoles(@AuthenticationPrincipal Jwt jwt,
+                                      @PathVariable UUID userId,
+                                      @PathVariable Role role) {
+    CurrentUser currentUser = CurrentUser.fromJwt(jwt);
+    return userService.removeRoleFromUser(userId, currentUser.organizationId(), role)
+            .flatMap(user -> userRoleRepository.findAllByUserId(user.getId())
+                    .map(UserRole::getRole).collect(Collectors.toSet())
+                    .map(roles -> {
+                      var dto = IdentityMapper.mapFromUserToUserResponseDto(user, roles);
+                      return new Result("Roles removed successfully", true, dto, StatusCode.SUCCESS);
+                    }));
   }
 }

@@ -52,15 +52,27 @@ public class UserRoleRepositoryImpl implements UserRoleRepository {
   @Override
   public Mono<Boolean> existsByUserIdAndRole(UUID userId, Role role) {
     return databaseClient.sql("""
-            SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = :userId AND role = :role) AS exists
+            SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = :userId AND role = :role) AS role_exists
             """)
-            .bind("userId", userId)
-            .bind("role", role.name())
+            .bind(0, userId)
+            .bind(1, role.name())
             .map((row, rowMetadata) ->
                     Boolean.TRUE.equals(
                             row.get("role_exists", Boolean.class)
                     )
             )
             .one();
+  }
+
+  @Override
+  public Mono<Void> deleteByUserIdAndRole(UUID userId, Role role) {
+    return databaseClient.sql("""
+            DELETE FROM user_roles WHERE user_id = $1 AND role = $2
+            """)
+            .bind(0, userId)
+            .bind(1, role.name())
+            .fetch()
+            .rowsUpdated()
+            .then();
   }
 }

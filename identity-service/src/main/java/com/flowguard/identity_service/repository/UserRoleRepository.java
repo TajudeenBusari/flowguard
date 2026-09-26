@@ -12,4 +12,5 @@ public interface UserRoleRepository {
   Mono<UserRole> save(UUID userId, Role role);
   Flux<UserRole> findAllByUserId(UUID userId);
   Mono<Boolean> existsByUserIdAndRole(UUID userId, Role role);
+  Mono<Void> deleteByUserIdAndRole(UUID userId, Role role);
 }
