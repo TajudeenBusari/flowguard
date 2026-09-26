@@ -55,4 +55,10 @@ public class GlobalExceptionHandlerAdvice {
   public Mono<Result> handleBadCredentialsException(BadCredentialsException ex) {
     return Mono.just(new Result("Invalid email or password", false, StatusCode.UNAUTHORIZED));
   }
+
+  @ExceptionHandler(InvalidRoleOperationException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Mono<Result> handleInvalidRoleOperationException(InvalidRoleOperationException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
+  }
 }

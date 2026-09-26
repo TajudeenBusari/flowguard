@@ -4,9 +4,7 @@ import com.flowguard.identity_service.dto.CreateUserRequest;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.User;
 import com.flowguard.identity_service.entity.UserStatus;
-import com.flowguard.identity_service.exception.OrganizationNotFoundException;
-import com.flowguard.identity_service.exception.UserAlreadyExistsException;
-import com.flowguard.identity_service.exception.UserNotFoundException;
+import com.flowguard.identity_service.exception.*;
 import com.flowguard.identity_service.repository.OrganizationRepository;
 import com.flowguard.identity_service.repository.UserRepository;
 import com.flowguard.identity_service.repository.UserRoleRepository;
@@ -85,6 +83,42 @@ public class UserServiceImpl implements UserService {
   @Override
   public Flux<User> getUsersByOrganizationId(UUID organizationId) {
     return userRepository.findAllByOrganizationId(organizationId);
+  }
+
+  /**
+   * This prevents an OWNER from organization A from assigning roles to a user in organization B.
+   * For FlowGuard, OWNER is special: it represents organization ownership, not an ordinary role promotion
+   * So this operation is only allowed for OWNERs to assign MEMBER or ADMIN roles to users within the same organization.
+   * We also make the role assignment idempotent: if the user already has the role, we just return the user without error.
+   */
+  @Override
+  public Mono<User> assignRoleToUser(UUID userId, UUID organizationId, Role role) {
+    if (role == Role.OWNER){
+      return Mono.error(new InvalidRoleOperationException(role));
+    }
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+            .flatMap(user ->
+                    userRoleRepository.existsByUserIdAndRole(user.getId(), role)
+                            .flatMap(exists ->{
+                              if (exists) {
+                                return Mono.just(user);
+                              }
+                              return userRoleRepository.save(user.getId(), role).thenReturn(user);
+                            })
+            );
+  }
+
+  @Override
+  public Mono<User> removeRoleFromUser(UUID userId, UUID organizationId, Role role) {
+
+    if (role == Role.OWNER){
+      return Mono.error(new InvalidRoleOperationException(role));
+    }
+
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+            .flatMap(user -> userRoleRepository.deleteByUserIdAndRole(user.getId(), role).thenReturn(user));
   }
 
 }
