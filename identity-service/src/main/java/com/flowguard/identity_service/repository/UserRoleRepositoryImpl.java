@@ -2,6 +2,7 @@ package com.flowguard.identity_service.repository;
 
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.UserRole;
+import com.flowguard.identity_service.entity.UserStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
@@ -74,5 +75,22 @@ public class UserRoleRepositoryImpl implements UserRoleRepository {
             .fetch()
             .rowsUpdated()
             .then();
+  }
+
+  @Override
+  public Mono<Long> countActiveOwnersByOrganizationId(UUID organizationId) {
+    return databaseClient.sql("""
+            SELECT COUNT(*) AS active_owner_count
+            FROM user_roles ur
+            JOIN users u ON u.id = ur.user_id
+            WHERE u.organization_id = $1
+              AND ur.role = $2
+              AND u.status = $3
+            """)
+            .bind(0, organizationId)
+            .bind(1, Role.OWNER.name())
+            .bind(2, UserStatus.ACTIVE.name())
+            .map((row, rowMetadata) -> row.get("active_owner_count", Long.class))
+            .one();
   }
 }

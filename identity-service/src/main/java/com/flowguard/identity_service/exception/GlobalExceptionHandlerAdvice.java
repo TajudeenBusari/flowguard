@@ -61,4 +61,10 @@ public class GlobalExceptionHandlerAdvice {
   public Mono<Result> handleInvalidRoleOperationException(InvalidRoleOperationException ex) {
     return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
   }
+
+  @ExceptionHandler(LastActiveOwnerException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Mono<Result> handleLastActiveOwnerException(LastActiveOwnerException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
+  }
 }

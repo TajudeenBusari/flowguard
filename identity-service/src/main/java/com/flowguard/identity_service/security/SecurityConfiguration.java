@@ -59,6 +59,7 @@ public class SecurityConfiguration {
                     .pathMatchers(HttpMethod.GET, baseUrl + "/organizations/users").hasAnyRole("OWNER", "ADMIN")
                     .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/*/roles").hasRole("OWNER")
                     .pathMatchers(HttpMethod.DELETE, baseUrl + "/organizations/users/*/roles/*").hasRole("OWNER")
+                    .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/*/status").hasRole("OWNER")
                     .anyExchange()
                     .authenticated()
             )

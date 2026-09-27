@@ -76,7 +76,7 @@ public class UserServiceImpl implements UserService {
             .switchIfEmpty(Mono.error(new UserNotFoundException(userId)));
   }
 
-  /*
+  /**
     * Organization with zero users naturally returns an empty list,
     * which is a valid response. So, no need to throw an exception for that case.
    */
@@ -93,9 +93,7 @@ public class UserServiceImpl implements UserService {
    */
   @Override
   public Mono<User> assignRoleToUser(UUID userId, UUID organizationId, Role role) {
-    if (role == Role.OWNER){
-      return Mono.error(new InvalidRoleOperationException(role));
-    }
+
     return userRepository.findByIdAndOrganizationId(userId, organizationId)
             .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
             .flatMap(user ->
@@ -109,16 +107,119 @@ public class UserServiceImpl implements UserService {
             );
   }
 
+  /**
+   * This prevents an OWNER from organization A from removing roles from a user in organization B.
+   * For FlowGuard, OWNER is special: it represents organization ownership, not an ordinary role demotion
+   * So this operation is only allowed for OWNERs to remove MEMBER or ADMIN roles from users within the same organization.
+   * We also make the role removal idempotent: if the user doesn't have the role, we just return the user without error.
+   * begin transaction
+   *       ↓
+   * lock organization row
+   *       ↓
+   * count ACTIVE OWNERs
+   *       ↓
+   * validate invariant
+   *       ↓
+   * remove OWNER role
+   *       ↓
+   * commit → release lock
+   * The important concurrency protection is the combination of:
+   * 1. locking the organization row for update (organizationRepository.findByIdForUpdate(organizationId))
+   * 2. as(transactionalOperator::transactional) to ensure the lock is held for the duration of the transaction
+   */
   @Override
   public Mono<User> removeRoleFromUser(UUID userId, UUID organizationId, Role role) {
 
-    if (role == Role.OWNER){
-      return Mono.error(new InvalidRoleOperationException(role));
-    }
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+
+            .flatMap(user -> {
+              if(role == Role.OWNER && user.getStatus() == UserStatus.ACTIVE){
+                return organizationRepository.findByIdForUpdate(organizationId)
+
+                        .switchIfEmpty(Mono.error(new OrganizationNotFoundException(organizationId)))
+
+                        .then(userRoleRepository.countActiveOwnersByOrganizationId(organizationId))
+
+                        .flatMap(activeOwnerCount -> {
+                          if (activeOwnerCount <=1){
+                            log.info("Active OWNER count for organization {} is {}, cannot remove the last active OWNER", organizationId, activeOwnerCount);
+                            return Mono.error(new LastActiveOwnerException());
+                          }
+                          // else, if there are more than 1 active OWNERs, we can safely remove this OWNER role
+                          return userRoleRepository.deleteByUserIdAndRole(user.getId(), role)
+                                  .thenReturn(user);
+                        });
+
+              }
+              // else, if the role is not OWNER or the user is not active, we can safely remove the role without any additional checks
+              //OWNER can also be removed directly when the user is
+              //already SUSPENDED or DISABLED because that user is
+              //not counted as an ACTIVE OWNER
+              return userRoleRepository.deleteByUserIdAndRole(user.getId(), role).thenReturn(user);
+            }).as(transactionalOperator::transactional);
+  }
+
+  /**
+   *  passing organizationId ensures the operation is tenant scoped,
+   *  so an OWNER from organization A cannot change the status of a user in organization B.
+   *  Just like role assignment and removal, this operation is also idempotent:
+   *  if the user already has the requested status, we just return the user without error.
+   *  2 active OWNERs
+   * → suspend one OWNER
+   * → allowed
+   * 1 active OWNER
+   * → suspend that OWNER
+   * → rejected
+   * This: user.getStatus() == UserStatus.ACTIVE is because we only need the active count protection
+   * when transitioning from ACTIVE to SUSPENDED or DISABLED. If the user is already SUSPENDED or DISABLED, we don't need to check the active count.
+   * lock organization
+   *        ↓
+   * count active OWNERs
+   *        ↓
+   * validate invariant
+   *        ↓
+   * change status
+   *        ↓
+   * commit + release lock
+   */
+  @Override
+  public Mono<User> updateUserStatus(UUID userId, UUID organizationId, UserStatus status) {
 
     return userRepository.findByIdAndOrganizationId(userId, organizationId)
+
             .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
-            .flatMap(user -> userRoleRepository.deleteByUserIdAndRole(user.getId(), role).thenReturn(user));
+
+            .flatMap(user ->
+
+              userRoleRepository.existsByUserIdAndRole(user.getId(), Role.OWNER)
+
+                      .flatMap(isOwner -> {
+
+                        if (isOwner && user.getStatus() == UserStatus.ACTIVE && status != UserStatus.ACTIVE) {
+                          return organizationRepository.findByIdForUpdate(organizationId)
+                                  .switchIfEmpty(Mono.error(new OrganizationNotFoundException(organizationId)))
+                                  .then(userRoleRepository.countActiveOwnersByOrganizationId(organizationId))
+
+                                  .flatMap(activeOwnerCount -> {
+
+                                    if (activeOwnerCount <= 1){
+                                      log.info("Active OWNER count for organization {} is {}, cannot suspend or disable the last active OWNER", organizationId, activeOwnerCount);
+                                      return Mono.error(new LastActiveOwnerException());
+                                    }
+                                    // else, if there are more than 1 active OWNERs, we can safely suspend this OWNER
+                                    user.setStatus(status);
+                                    user.setUpdatedAt(Instant.now());
+                                    return userRepository.save(user);
+                                  });
+                        }
+                        // else, if the user is not an OWNER, we can safely update the status without any additional checks
+                        user.setStatus(status);
+                        user.setUpdatedAt(Instant.now());
+                        return userRepository.save(user);
+                      })
+            ).as(transactionalOperator::transactional);
   }
 
 }

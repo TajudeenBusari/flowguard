@@ -2,6 +2,7 @@ package com.flowguard.identity_service.controller;
 
 import com.flowguard.identity_service.dto.AssignRoleRequest;
 import com.flowguard.identity_service.dto.CreateUserRequest;
+import com.flowguard.identity_service.dto.UpdateUserStatusRequest;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.UserRole;
 import com.flowguard.identity_service.mapper.IdentityMapper;
@@ -95,4 +96,18 @@ public class UserController {
                       return new Result("Roles removed successfully", true, dto, StatusCode.SUCCESS);
                     }));
   }
+
+  @PutMapping("/{userId}/status")
+  public Mono<Result> updateUserStatus(@AuthenticationPrincipal Jwt jwt,
+                                       @PathVariable UUID userId,
+                                       @Valid @RequestBody UpdateUserStatusRequest request) {
+      CurrentUser currentUser = CurrentUser.fromJwt(jwt);
+      return userService.updateUserStatus(userId, currentUser.organizationId(), request.status())
+              .flatMap(user -> userRoleRepository.findAllByUserId(user.getId())
+                      .map(UserRole::getRole).collect(Collectors.toSet())
+                      .map(roles -> {
+                        var dto = IdentityMapper.mapFromUserToUserResponseDto(user, roles);
+                        return new Result("User status updated successfully", true, dto, StatusCode.SUCCESS);
+                      }));
+    }
 }

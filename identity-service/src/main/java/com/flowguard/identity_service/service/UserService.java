@@ -3,6 +3,7 @@ package com.flowguard.identity_service.service;
 import com.flowguard.identity_service.dto.CreateUserRequest;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.User;
+import com.flowguard.identity_service.entity.UserStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -15,4 +16,5 @@ public interface UserService {
   //This prevents an OWNER from organization A from assigning roles to a user in organization B.
   Mono<User> assignRoleToUser(UUID userId, UUID organizationId, Role roleName);
   Mono<User> removeRoleFromUser(UUID userId, UUID organizationId, Role roleName);
+  Mono<User> updateUserStatus(UUID userId, UUID organizationId, UserStatus status);
 }
