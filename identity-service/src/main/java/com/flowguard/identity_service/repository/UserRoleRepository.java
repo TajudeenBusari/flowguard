@@ -13,4 +13,6 @@ public interface UserRoleRepository {
   Flux<UserRole> findAllByUserId(UUID userId);
   Mono<Boolean> existsByUserIdAndRole(UUID userId, Role role);
   Mono<Void> deleteByUserIdAndRole(UUID userId, Role role);
+  //an organization must have only active owner at a time
+  Mono<Long> countActiveOwnersByOrganizationId(UUID organizationId);
 }
