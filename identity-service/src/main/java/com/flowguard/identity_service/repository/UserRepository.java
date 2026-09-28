@@ -19,5 +19,5 @@ public interface UserRepository extends ReactiveCrudRepository<User, UUID> {
   Flux<User> findAllByOrganizationId(UUID organizationId);
 
 
-//  Mono<Boolean> existsByOrganizationIdAndEmail(UUID organizationId, String email);
+  Mono<Boolean> existsByOrganizationIdAndEmail(UUID organizationId, String email);
 }

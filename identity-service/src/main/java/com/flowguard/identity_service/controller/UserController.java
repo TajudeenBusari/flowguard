@@ -1,9 +1,6 @@
 package com.flowguard.identity_service.controller;
 
-import com.flowguard.identity_service.dto.AssignRoleRequest;
-import com.flowguard.identity_service.dto.CreateUserRequest;
-import com.flowguard.identity_service.dto.UpdateProfileRequest;
-import com.flowguard.identity_service.dto.UpdateUserStatusRequest;
+import com.flowguard.identity_service.dto.*;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.UserRole;
 import com.flowguard.identity_service.mapper.IdentityMapper;
@@ -142,4 +139,25 @@ public class UserController {
                     }));
   }
 
+  @PutMapping("/me/password")
+  public Mono<Result> changePassword(@AuthenticationPrincipal Jwt jwt,
+                                     @Valid @RequestBody ChangePasswordRequest request) {
+    CurrentUser currentUser = CurrentUser.fromJwt(jwt);
+    return userService.changePassword(currentUser.userId(), currentUser.organizationId(), request)
+            .thenReturn(new Result("Password changed successfully", true, null, StatusCode.SUCCESS));
+  }
+
+  @PutMapping("/me/email")
+  public Mono<Result> changeEmail(@AuthenticationPrincipal Jwt jwt,
+                                  @Valid @RequestBody ChangeEmailRequest request) {
+    CurrentUser currentUser = CurrentUser.fromJwt(jwt);
+    return userService.changeEmail(currentUser.userId(), currentUser.organizationId(), request)
+            .flatMap(user -> userRoleRepository.findAllByUserId(user.getId())
+                    .map(UserRole::getRole).collect(Collectors.toSet())
+                    .map(roles ->
+                      new Result("Email changed successfully", true, IdentityMapper.mapFromUserToUserResponseDto(user, roles), StatusCode.SUCCESS)
+                    )
+            );
+
+  }
 }
