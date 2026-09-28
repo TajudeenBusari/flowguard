@@ -56,6 +56,18 @@ public class GlobalExceptionHandlerAdvice {
     return Mono.just(new Result("Invalid email or password", false, StatusCode.UNAUTHORIZED));
   }
 
+  @ExceptionHandler(IncorrectCurrentPasswordException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Mono<Result> handleIncorrectCurrentPasswordException(IncorrectCurrentPasswordException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
+  }
+
+  @ExceptionHandler(PasswordUnchangedException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Mono<Result> handlePasswordUnchangedException(PasswordUnchangedException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
+  }
+
   @ExceptionHandler(InvalidRoleOperationException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Mono<Result> handleInvalidRoleOperationException(InvalidRoleOperationException ex) {
@@ -66,5 +78,11 @@ public class GlobalExceptionHandlerAdvice {
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Mono<Result> handleLastActiveOwnerException(LastActiveOwnerException ex) {
     return Mono.just(new Result(ex.getMessage(), false, StatusCode.BAD_REQUEST));
+  }
+
+  @ExceptionHandler(EmailAlreadyExistsException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public Mono<Result> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.CONFLICT));
   }
 }

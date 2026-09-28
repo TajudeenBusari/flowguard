@@ -1,5 +1,7 @@
 package com.flowguard.identity_service.service.impl;
 
+import com.flowguard.identity_service.dto.ChangeEmailRequest;
+import com.flowguard.identity_service.dto.ChangePasswordRequest;
 import com.flowguard.identity_service.dto.CreateUserRequest;
 import com.flowguard.identity_service.dto.UpdateProfileRequest;
 import com.flowguard.identity_service.entity.Role;
@@ -12,6 +14,7 @@ import com.flowguard.identity_service.repository.UserRoleRepository;
 import com.flowguard.identity_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
@@ -241,6 +244,79 @@ public class UserServiceImpl implements UserService {
               user.setLastName(request.lastName().trim());
               user.setUpdatedAt(Instant.now());
               return userRepository.save(user);
+            });
+  }
+
+  @Override
+  public Mono<Void> changePassword(UUID userId, UUID organizationId, ChangePasswordRequest request) {
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+            .flatMap(user ->
+                    Mono.fromCallable(() -> {
+                      if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())){
+                        throw new IncorrectCurrentPasswordException();
+                      }
+                      if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())){
+                        throw new PasswordUnchangedException();
+                      }
+                      return passwordEncoder.encode(request.newPassword());
+                    })
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(encodedPassword -> {
+              user.setPasswordHash(encodedPassword);
+              user.setUpdatedAt(Instant.now());
+              return userRepository.save(user);
+
+            })).then();
+  }
+
+  /**
+   * Change-email flow:
+   * Find user within organization
+   *        ↓
+   * Verify current password
+   *        ↓
+   * Is requested email the same as current email?
+   *        ↓ yes
+   * Return user unchanged
+   *        ↓ no
+   * Check whether requested email already exists
+   * within the organization
+   *        ↓ exists
+   * Throw EmailAlreadyExistsException
+   *        ↓ available
+   * Update email and return user
+   */
+  @Override
+  public Mono<User> changeEmail(UUID userId, UUID organizationId, ChangeEmailRequest request) {
+
+    String normalizedEmail = request.newEmail().trim().toLowerCase(Locale.ROOT);
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+            .flatMap(user -> Mono.fromCallable(() -> {
+              if(!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())){
+                throw new IncorrectCurrentPasswordException();
+              }
+              return user;
+
+            }).subscribeOn(Schedulers.boundedElastic())
+            ).flatMap(user -> {
+              //if email is the same as current email, we just return the user without error, no need for database update when nothing has changed
+              if(user.getEmail().equalsIgnoreCase(normalizedEmail)){
+                return Mono.just(user);
+              }
+              // else, if the email is different, we need to check whether the new email already exists within the organization
+              return userRepository.existsByOrganizationIdAndEmail(organizationId, normalizedEmail)
+                      .flatMap(emailExists -> {
+                        if (emailExists) {
+                          return Mono.error(new EmailAlreadyExistsException(normalizedEmail));
+                        }
+                        // else, if the email is available, we can safely update the user's email
+                        user.setEmail(normalizedEmail);
+                        user.setUpdatedAt(Instant.now());
+                        return userRepository.save(user);
+                      });
+
             });
   }
 
