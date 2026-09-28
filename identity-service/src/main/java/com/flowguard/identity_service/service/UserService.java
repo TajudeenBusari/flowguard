@@ -1,6 +1,7 @@
 package com.flowguard.identity_service.service;
 
 import com.flowguard.identity_service.dto.CreateUserRequest;
+import com.flowguard.identity_service.dto.UpdateProfileRequest;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.User;
 import com.flowguard.identity_service.entity.UserStatus;
@@ -17,4 +18,5 @@ public interface UserService {
   Mono<User> assignRoleToUser(UUID userId, UUID organizationId, Role roleName);
   Mono<User> removeRoleFromUser(UUID userId, UUID organizationId, Role roleName);
   Mono<User> updateUserStatus(UUID userId, UUID organizationId, UserStatus status);
+  Mono<User> updateUserProfile(UUID userId, UUID organizationId, UpdateProfileRequest request);
 }

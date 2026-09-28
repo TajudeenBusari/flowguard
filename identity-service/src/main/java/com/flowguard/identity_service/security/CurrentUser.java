@@ -11,7 +11,7 @@ public record CurrentUser(
 ) {
   public static CurrentUser fromJwt(Jwt jwt){
     return new CurrentUser(
-            UUID.fromString(jwt.getSubject()),
+            UUID.fromString(jwt.getSubject()), //userId is stored in the subject claim of the JWT
             UUID.fromString(jwt.getClaimAsString("organizationId")),
             jwt.getClaimAsString("email")
     );

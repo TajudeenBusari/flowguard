@@ -1,6 +1,7 @@
 package com.flowguard.identity_service.service.impl;
 
 import com.flowguard.identity_service.dto.CreateUserRequest;
+import com.flowguard.identity_service.dto.UpdateProfileRequest;
 import com.flowguard.identity_service.entity.Role;
 import com.flowguard.identity_service.entity.User;
 import com.flowguard.identity_service.entity.UserStatus;
@@ -220,6 +221,27 @@ public class UserServiceImpl implements UserService {
                         return userRepository.save(user);
                       })
             ).as(transactionalOperator::transactional);
+  }
+
+  /**
+   *  Passing organizationId and userId derived from the JWT ensures the operation is tenant scoped,
+   *  So an OWNER from organization A cannot change the profile of a user in organization B.
+   *  Or different owners in the same organization cannot change each other's profile.
+   *  This operation is idempotent: if the user already has the requested profile, we just return the user without error.
+   */
+  @Override
+  public Mono<User> updateUserProfile(UUID userId, UUID organizationId, UpdateProfileRequest request) {
+
+    return userRepository.findByIdAndOrganizationId(userId, organizationId)
+
+            .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+
+            .flatMap(user -> {
+              user.setFirstName(request.firstName().trim());
+              user.setLastName(request.lastName().trim());
+              user.setUpdatedAt(Instant.now());
+              return userRepository.save(user);
+            });
   }
 
 }
