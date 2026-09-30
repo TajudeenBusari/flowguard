@@ -61,6 +61,11 @@ public class SecurityConfiguration {
             .authorizeExchange(exchanges -> exchanges
                     .pathMatchers(HttpMethod.POST, baseUrl + "/auth/login").permitAll()
                     .pathMatchers(HttpMethod.POST, baseUrl + "/auth/refresh").permitAll()
+
+                    //Why permitAll()? The access JWT might already be expired when the client wants to log out.
+                    // The refresh token is the credential being revoked, so requiring a valid access JWT would unnecessarily prevent logout in that situation.
+                    .pathMatchers(HttpMethod.POST, baseUrl + "/auth/logout").permitAll()
+
                     .pathMatchers(HttpMethod.POST, baseUrl + "/organizations" ).permitAll()
                     .pathMatchers(HttpMethod.POST, baseUrl + "/organizations/users").hasRole("OWNER")
                     .pathMatchers(HttpMethod.GET, baseUrl + "/organizations/users").hasAnyRole("OWNER", "ADMIN")
