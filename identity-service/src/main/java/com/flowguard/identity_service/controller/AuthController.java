@@ -1,6 +1,7 @@
 package com.flowguard.identity_service.controller;
 
 import com.flowguard.identity_service.dto.LoginRequest;
+import com.flowguard.identity_service.dto.LogoutRequest;
 import com.flowguard.identity_service.dto.RefreshTokenRequest;
 import com.flowguard.identity_service.service.AuthService;
 import com.tjtechy.system.Result;
@@ -59,6 +60,23 @@ public class AuthController {
             .map(refreshTokenResponse ->
               new Result("Token refreshed successfully", true, refreshTokenResponse, StatusCode.SUCCESS)
             );
+  }
+
+  /**
+   * Refresh A active
+   *       ↓
+   *     logout
+   *       ↓
+   * Refresh A revoked
+   *       ↓
+   * try Refresh A
+   *       ↓
+   *     401
+   */
+  @PostMapping("/logout")
+  public Mono<Result> logout(@Valid @RequestBody LogoutRequest request){
+    return authService.logout(request)
+            .thenReturn(new Result("Logged out successfully", true, null, StatusCode.SUCCESS));
   }
 
   //only used for testing purposes, can be removed in production

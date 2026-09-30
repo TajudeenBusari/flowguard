@@ -1,10 +1,7 @@
 package com.flowguard.identity_service.service.impl;
 
 import com.flowguard.identity_service.config.RsaKeyProperties;
-import com.flowguard.identity_service.dto.LoginRequest;
-import com.flowguard.identity_service.dto.LoginResponse;
-import com.flowguard.identity_service.dto.RefreshTokenRequest;
-import com.flowguard.identity_service.dto.RefreshTokenResponse;
+import com.flowguard.identity_service.dto.*;
 import com.flowguard.identity_service.entity.User;
 import com.flowguard.identity_service.entity.UserRole;
 import com.flowguard.identity_service.entity.UserStatus;
@@ -136,5 +133,25 @@ public class AuthServiceImpl implements AuthService {
                       ));
                 })
             );
+  }
+
+  /**
+   * Raw refresh token
+   *       ↓
+   * hash + find session
+   *       ↓
+   * validate it
+   *       ↓
+   * revoke that specific session
+   * This logs out only that refresh session/device, not every session belonging to the user.
+   * An invalid, expired, or already-revoked refresh token will currently produce the same existing:
+   * 401 Invalid or expired refresh token
+   */
+  @Override
+  public Mono<Void> logout(LogoutRequest request) {
+    return refreshTokenService.validateRefreshToken(request.refreshToken())
+            .flatMap(refreshSession ->
+                    refreshTokenService.revokeRefreshSession(refreshSession));
+    //can also be written as: refreshTokenService::revokeRefreshSession
   }
 }
