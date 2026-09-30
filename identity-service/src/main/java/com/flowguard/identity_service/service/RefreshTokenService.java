@@ -42,4 +42,17 @@ public interface RefreshTokenService {
   Mono<Void> revokeRefreshSession(RefreshSession refreshSession);
 
   Mono<String> rotateRefreshToken(RefreshSession refreshSession);
+
+  /**
+   * userId
+   *   ↓
+   * find all refresh sessions
+   *   ↓
+   * keep active sessions
+   *   ↓
+   * set revokedAt = now
+   *   ↓
+   * save them
+   */
+  Mono<Void> revokeAllRefreshSessionsForUser(UUID userId);
 }
