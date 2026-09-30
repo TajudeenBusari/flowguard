@@ -13,14 +13,40 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.concurrent.Flow;
 
-
-
+/**
+ * LOGIN
+ * Authentication
+ *      ↓
+ * FlowGuardPrincipal ───────┐
+ *                           │
+ *                           ▼
+ *                  createToken(principal)
+ *                           ▲
+ *                           │
+ * REFRESH ──────────────────┘
+ * Login and Refresh can share the same JWT creation logic,
+ * so we can have a single service that creates the JWT token for both flows.
+ */
 @Service
 @RequiredArgsConstructor
 public class JwtTokenService {
   private final JwtEncoder jwtEncoder;
   private final RsaKeyProperties rsaKeyProperties;
+
+  /**
+   * delegates to createToken(FlowGuardPrincipal principal) after extracting
+   * the principal from the Authentication object
+   */
+  public String createToken(Authentication authentication) {
+
+    if (!(authentication.getPrincipal() instanceof FlowGuardPrincipal principal)) {
+      throw new IllegalArgumentException("Authentication principal is not of type FlowGuardPrincipal");
+    }
+
+    return createToken(principal);
+  }
 
   /**
    * Two important decisions here: sub is the immutable user UUID rather than email,
@@ -29,9 +55,7 @@ public class JwtTokenService {
    * instead of trusting an organization ID supplied by the client.
 
    */
-  public String createToken(Authentication authentication) {
-
-    FlowGuardPrincipal principal = (FlowGuardPrincipal) authentication.getPrincipal();
+  public String createToken(FlowGuardPrincipal principal) {
 
     /*
      * since roles and permission are not necessarily same, when the security model eventually contains permissions beyond
@@ -40,7 +64,6 @@ public class JwtTokenService {
     User user = principal.getUser();
     Instant now = Instant.now();
     Instant expiresAt = now.plus(rsaKeyProperties.accessTokenExpiration());
-
 
     JwtClaimsSet claims = JwtClaimsSet.builder()
             .issuer(rsaKeyProperties.issuer())
@@ -54,6 +77,7 @@ public class JwtTokenService {
     JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
 
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+
   }
 
 }
