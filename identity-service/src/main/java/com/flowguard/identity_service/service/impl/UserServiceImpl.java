@@ -97,6 +97,13 @@ public class UserServiceImpl implements UserService {
    * For FlowGuard, OWNER is special: it represents organization ownership, not an ordinary role promotion
    * So this operation is only allowed for OWNERs to assign MEMBER or ADMIN roles to users within the same organization.
    * We also make the role assignment idempotent: if the user already has the role, we just return the user without error.
+   * Assign role
+   *     +
+   * Revoke refresh sessions
+   *     ↓
+   * one transaction
+   *     ↓
+   * both succeed or both roll back
    */
   @Override
   public Mono<User> assignRoleToUser(UUID userId, UUID organizationId, Role role) {
@@ -109,9 +116,14 @@ public class UserServiceImpl implements UserService {
                               if (exists) {
                                 return Mono.just(user);
                               }
-                              return userRoleRepository.save(user.getId(), role).thenReturn(user);
+                              //else, if the user doesn't have the role, we can safely assign the role and
+                              // revoke all refresh sessions for this user to force re-login with new role
+                              return userRoleRepository
+                                      .save(user.getId(), role)
+                                      .then(refreshTokenService.revokeAllRefreshSessionsForUser(user.getId()))
+                                      .thenReturn(user);
                             })
-            );
+            ).as(transactionalOperator::transactional);
   }
 
   /**
@@ -129,6 +141,7 @@ public class UserServiceImpl implements UserService {
    *       ↓
    * remove OWNER role
    *       ↓
+   * revoke refresh tokens
    * commit → release lock
    * The important concurrency protection is the combination of:
    * 1. locking the organization row for update (organizationRepository.findByIdForUpdate(organizationId))
@@ -155,8 +168,8 @@ public class UserServiceImpl implements UserService {
                             return Mono.error(new LastActiveOwnerException());
                           }
                           // else, if there are more than 1 active OWNERs, we can safely remove this OWNER role
-                          return userRoleRepository.deleteByUserIdAndRole(user.getId(), role)
-                                  .thenReturn(user);
+                          //return userRoleRepository.deleteByUserIdAndRole(user.getId(), role)
+                          return removeRoleAndHandleRefreshTokenRevocation(user, role);
                         });
 
               }
@@ -164,8 +177,19 @@ public class UserServiceImpl implements UserService {
               //OWNER can also be removed directly when the user is
               //already SUSPENDED or DISABLED because that user is
               //not counted as an ACTIVE OWNER
-              return userRoleRepository.deleteByUserIdAndRole(user.getId(), role).thenReturn(user);
+              //return userRoleRepository.deleteByUserIdAndRole(user.getId(), role).thenReturn(user);
+              return removeRoleAndHandleRefreshTokenRevocation(user, role);
             }).as(transactionalOperator::transactional);
+  }
+
+  /**
+   * This helper method will prevent writing duplicate code
+   * after role is removed (method called twice in removeRoleFromUser method)
+   */
+  private Mono<User> removeRoleAndHandleRefreshTokenRevocation(User user, Role role) {
+    return userRoleRepository.deleteByUserIdAndRole(user.getId(), role)
+            .then(refreshTokenService.revokeAllRefreshSessionsForUser(user.getId()))
+            .thenReturn(user);
   }
 
   /**
@@ -216,16 +240,10 @@ public class UserServiceImpl implements UserService {
                                       return Mono.error(new LastActiveOwnerException());
                                     }
                                     // else, if there are more than 1 active OWNERs, we can safely suspend this OWNER
-//                                    user.setStatus(status);
-//                                    user.setUpdatedAt(Instant.now());
-//                                    return userRepository.save(user);
                                     return saveStatusAndHandleRefreshTokenRevocation(user, status);
                                   });
                         }
                         // else, if the user is not an OWNER, we can safely update the status without any additional checks
-//                        user.setStatus(status);
-//                        user.setUpdatedAt(Instant.now());
-//                        return userRepository.save(user);
                         return saveStatusAndHandleRefreshTokenRevocation(user, status);
                       })
             ).as(transactionalOperator::transactional);
