@@ -7,6 +7,7 @@ import com.flowguard.identity_service.dto.RefreshTokenRequest;
 import com.flowguard.identity_service.dto.RefreshTokenResponse;
 import com.flowguard.identity_service.entity.User;
 import com.flowguard.identity_service.entity.UserRole;
+import com.flowguard.identity_service.entity.UserStatus;
 import com.flowguard.identity_service.exception.InvalidRefreshTokenException;
 import com.flowguard.identity_service.repository.UserRepository;
 import com.flowguard.identity_service.repository.UserRoleRepository;
@@ -75,6 +76,11 @@ public class AuthServiceImpl implements AuthService {
    *       ↓
    * load user
    *       ↓
+   * Is user ACTIVE?  ← new check
+   *       ↓          ↓
+   *       yes        no
+   *        ↓         ↓
+   *     roles       401
    * load CURRENT roles
    *       ↓
    * create new access JWT
@@ -92,16 +98,23 @@ public class AuthServiceImpl implements AuthService {
   @Override
   public Mono<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
 
-    return refreshTokenService.validateRefreshToken(request.refreshToken())
-            .flatMap(refreshSession -> userRepository
+    return refreshTokenService
+            .validateRefreshToken(request.refreshToken())
+            .flatMap(refreshSession -> userRepository.findById(refreshSession.getUserId())
 
-                    .findById(refreshSession.getUserId())
+                            .switchIfEmpty(Mono.<User>error(new InvalidRefreshTokenException()))
 
-                    .switchIfEmpty(
-                            Mono.<User>error(new InvalidRefreshTokenException()))
+                            // a user may have been deactivated after the refresh token was issued,
+                            // so we need to check the status and not allow refresh if the user is not active
+                            .flatMap(user -> {
+                              if (user.getStatus() != UserStatus.ACTIVE){
+                                return Mono.<User>error(new InvalidRefreshTokenException());
+                              }
+                              //else, the user is active, so we can proceed with the refresh token flow
+                              return Mono.just(user);
+                            })
 
-            .flatMap(user -> userRoleRepository
-                    .findAllByUserId(user.getId())
+            .flatMap(user -> userRoleRepository.findAllByUserId(user.getId())
 
                     .map(UserRole::getRole)
 

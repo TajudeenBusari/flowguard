@@ -87,3 +87,27 @@ ______________________________________________________________________
         → hashed
         → revocable
         → rotated
+
+#### Revocation will be connected to password change and other security-sensitive changes.
+    - **Test change password scenario**:
+    1. Log in and save the returned refresh token as Refresh A.
+    2. User changes their password using the access token from that login.
+    3. After the password change succeeds, try: /refresh with Refresh A. It should fail because the refresh session was revoked when the password was changed.
+    4. This will prove:
+          Login → Refresh A active
+             ↓
+        Change password
+             ↓
+       Refresh A revoked
+             ↓
+       Try Refresh A
+             ↓
+           401
+    5. prevent suspended /disabled users from refreshing their access tokens.
+
+    - **Test the inactive user scenario**:
+    1. Log in as ACTIVE user and save the returned refresh token as Refresh A.
+    2. Suspend the user in the database using the OWNER account token.
+    3. Try: /refresh with Refresh A. It should fail because the user is suspended with 401 Unauthorized.
+
+#### docker exec -it flowguard-identity-postgres psql -U flowguard -d flowguard_identity

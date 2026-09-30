@@ -11,6 +11,7 @@ import com.flowguard.identity_service.exception.*;
 import com.flowguard.identity_service.repository.OrganizationRepository;
 import com.flowguard.identity_service.repository.UserRepository;
 import com.flowguard.identity_service.repository.UserRoleRepository;
+import com.flowguard.identity_service.service.RefreshTokenService;
 import com.flowguard.identity_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,8 @@ public class UserServiceImpl implements UserService {
   private final TransactionalOperator transactionalOperator;
 
   private final UserRoleRepository userRoleRepository;
+
+  private final RefreshTokenService refreshTokenService;
 
   /**
    * Begin -> verify email isn't already used -> create and insert user -> insert user role: OWNER -> Commit
@@ -213,17 +216,39 @@ public class UserServiceImpl implements UserService {
                                       return Mono.error(new LastActiveOwnerException());
                                     }
                                     // else, if there are more than 1 active OWNERs, we can safely suspend this OWNER
-                                    user.setStatus(status);
-                                    user.setUpdatedAt(Instant.now());
-                                    return userRepository.save(user);
+//                                    user.setStatus(status);
+//                                    user.setUpdatedAt(Instant.now());
+//                                    return userRepository.save(user);
+                                    return saveStatusAndHandleRefreshTokenRevocation(user, status);
                                   });
                         }
                         // else, if the user is not an OWNER, we can safely update the status without any additional checks
-                        user.setStatus(status);
-                        user.setUpdatedAt(Instant.now());
-                        return userRepository.save(user);
+//                        user.setStatus(status);
+//                        user.setUpdatedAt(Instant.now());
+//                        return userRepository.save(user);
+                        return saveStatusAndHandleRefreshTokenRevocation(user, status);
                       })
             ).as(transactionalOperator::transactional);
+  }
+
+  /**
+   * This helper method will prevent writing duplicate code
+   * after user is saved (method called twice in updateUserStatus method)
+   */
+  private Mono<User> saveStatusAndHandleRefreshTokenRevocation(User user, UserStatus status) {
+    user.setStatus(status);
+    user.setUpdatedAt(Instant.now());
+    return userRepository
+            .save(user)
+            .flatMap(savedUser -> {
+              if (status == UserStatus.ACTIVE) {
+                return Mono.just(savedUser);
+              }
+              // If the user is being suspended or disabled, revoke all refresh sessions for this user to force re-login
+              return refreshTokenService
+                      .revokeAllRefreshSessionsForUser(savedUser.getId())
+                      .thenReturn(savedUser);
+            });
   }
 
   /**
@@ -265,7 +290,11 @@ public class UserServiceImpl implements UserService {
             .flatMap(encodedPassword -> {
               user.setPasswordHash(encodedPassword);
               user.setUpdatedAt(Instant.now());
-              return userRepository.save(user);
+              return userRepository.save(user)
+                      //revoke all refresh sessions for this user after password change, to force re-login with new password
+                      .flatMap(savedUser -> refreshTokenService
+                              .revokeAllRefreshSessionsForUser(savedUser.getId())
+                              .thenReturn(savedUser));
 
             })).then();
   }

@@ -119,4 +119,29 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             .as(transactionalOperator::transactional);
   }
 
+  /**
+   * userId
+   *   ↓
+   * find all refresh sessions
+   *   ↓
+   * keep active sessions
+   *   ↓
+   * set revokedAt = now
+   *   ↓
+   * save them
+   */
+  @Override
+  public Mono<Void> revokeAllRefreshSessionsForUser(UUID userId) {
+    return Mono.defer(() -> {
+      Instant now = Instant.now();
+      return refreshSessionRepository.findAllByUserId(userId)
+              //This deliberately ignores sessions already revoked
+              .filter(refreshSession -> refreshSession.getRevokedAt() == null)
+              .flatMap(refreshSession -> {
+                refreshSession.setRevokedAt(now);
+                return refreshSessionRepository.save(refreshSession);
+              }).then();
+    });
+  }
+
 }
