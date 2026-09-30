@@ -69,21 +69,25 @@ public class AuthServiceImpl implements AuthService {
   }
 
   /**
-   * raw refresh token
-   *        ↓
-   * validate hash/session/expiration
-   *        ↓
-   * RefreshSession.userId
-   *        ↓
-   * load current User
-   *        ↓
-   * load CURRENT roles from database
-   *        ↓
-   * FlowGuardPrincipal
-   *        ↓
-   * create fresh 15-minute JWT
-   *        ↓
-   * RefreshTokenResponse
+   * Refresh token A
+   *       ↓
+   * validate A
+   *       ↓
+   * load user
+   *       ↓
+   * load CURRENT roles
+   *       ↓
+   * create new access JWT
+   *       ↓
+   * transaction:
+   *    revoke A
+   *    create B
+   *       ↓
+   * response:
+   *    accessToken
+   *    refreshToken B
+   *    The important structural difference is that we keep everything requiring the session inside:
+   *    .flatMap(refreshSession -> ...)
    */
   @Override
   public Mono<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
@@ -94,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
                     .findById(refreshSession.getUserId())
 
                     .switchIfEmpty(
-                            Mono.<User>error(new InvalidRefreshTokenException())))
+                            Mono.<User>error(new InvalidRefreshTokenException()))
 
             .flatMap(user -> userRoleRepository
                     .findAllByUserId(user.getId())
@@ -105,17 +109,19 @@ public class AuthServiceImpl implements AuthService {
 
                     .map(roles -> new FlowGuardPrincipal(user, roles)))
 
-            .map(principal -> {
+            .flatMap(principal -> {
 
               String accessToken = jwtTokenService.createToken(principal);
-
-              return new RefreshTokenResponse(
-                      accessToken,
-                      "Bearer",
-                      rsaKeyProperties
-                              .accessTokenExpiration()
-                              .getSeconds()
-              );
-            });
+              return refreshTokenService.rotateRefreshToken(refreshSession)
+                      .map(newRefreshToken -> new RefreshTokenResponse(
+                              accessToken,
+                              "Bearer",
+                              rsaKeyProperties
+                                      .accessTokenExpiration()
+                                      .getSeconds(),
+                              newRefreshToken
+                      ));
+                })
+            );
   }
 }

@@ -11,7 +11,34 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
-
+/** Login and refresh token flow:
+ *     ↓
+ * Login
+ *   ↓
+ * Access JWT + Refresh A
+ *   ↓
+ * Refresh using A
+ *   ↓
+ * A revoked
+ *   ↓
+ * Access JWT + Refresh B
+ *   ↓
+ * Reuse A
+ *   ↓
+ * because revoked_at != null
+ *     ↓
+ * 401
+ * Refresh using B
+ *   ↓
+ * Access JWT + Refresh C
+ *   ↓
+ * Reuse B
+ *   ↓
+ * because revoked_at != null
+ *     ↓
+ * 401
+ * etc...
+ */
 @RestController
 @RequestMapping("${api.endpoint.base-url}/auth")
 @RequiredArgsConstructor

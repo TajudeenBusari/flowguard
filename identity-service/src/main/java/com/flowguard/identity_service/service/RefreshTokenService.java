@@ -36,4 +36,10 @@ public interface RefreshTokenService {
    * return RefreshSession
    */
   Mono<RefreshSession> validateRefreshToken(String rawRefreshToken);
+
+  //The implementation should set revoked_at = Instant.now(), rather than deleting the row.
+  //This preserves the session record for security/auditing purpose
+  Mono<Void> revokeRefreshSession(RefreshSession refreshSession);
+
+  Mono<String> rotateRefreshToken(RefreshSession refreshSession);
 }
