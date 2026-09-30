@@ -23,7 +23,6 @@ public class User {
   private String firstName;
   private String lastName;
   private UserStatus status;
-  private Integer tokenVersion;
   private Instant createdAt;
   private Instant updatedAt;
 }

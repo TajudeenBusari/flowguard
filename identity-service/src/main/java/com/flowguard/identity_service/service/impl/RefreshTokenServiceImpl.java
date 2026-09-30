@@ -9,6 +9,7 @@ import com.flowguard.identity_service.security.RefreshTokenHasher;
 import com.flowguard.identity_service.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -16,11 +17,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class RefreshTokenImpl implements RefreshTokenService {
+public class RefreshTokenServiceImpl implements RefreshTokenService {
   private final RefreshSessionRepository refreshSessionRepository;
   private final RefreshTokenGenerator refreshTokenGenerator;
   private final RefreshTokenHasher refreshTokenHasher;
   private final RsaKeyProperties rsaKeyProperties;
+  private final TransactionalOperator transactionalOperator;
 
   /**
    * createRefreshToken(userId)
@@ -92,4 +94,29 @@ public class RefreshTokenImpl implements RefreshTokenService {
               });
     });
   }
+
+  @Override
+  public Mono<Void> revokeRefreshSession(RefreshSession refreshSession) {
+    refreshSession.setRevokedAt(Instant.now());
+    return refreshSessionRepository.save(refreshSession).then();
+  }
+
+  /**
+   * BEGIN
+   *   ↓
+   * revoke old session A
+   *   ↓
+   * create new session B
+   *   ↓
+   * both succeed?
+   *   ├─ YES → COMMIT
+   *   └─ NO  → ROLLBACK
+   */
+  @Override
+  public Mono<String> rotateRefreshToken(RefreshSession refreshSession) {
+    return revokeRefreshSession(refreshSession)
+            .then(createRefreshToken(refreshSession.getUserId()))
+            .as(transactionalOperator::transactional);
+  }
+
 }

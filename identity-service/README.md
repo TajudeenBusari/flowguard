@@ -71,3 +71,19 @@ ______________________________________________________________________
     create refresh token B
     ↓
     new access JWT + B
+    The same refresh token can be reused for 7 days. Each successful refresh should invalidate the old refresh token and issue a new one. 
+    This prevents replay attacks and ensures that if a refresh token is compromised, it can only be used once before being revoked.
+
+#### Flow:
+    users
+    → no token-version state
+
+    Access JWT
+        → 15 minutes
+        → stateless/local RSA validation
+
+    refresh_sessions
+        → server-side
+        → hashed
+        → revocable
+        → rotated
