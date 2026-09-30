@@ -111,3 +111,22 @@ ______________________________________________________________________
     3. Try: /refresh with Refresh A. It should fail because the user is suspended with 401 Unauthorized.
 
 #### docker exec -it flowguard-identity-postgres psql -U flowguard -d flowguard_identity
+
+#### When role changes are made refresh sessions should be revoked. 
+#### This is to ensure that users with elevated privileges cannot continue to use their old refresh tokens after their roles have been downgraded.
+    - **Test role downgrade scenario**:
+    1. Log in as a user with elevated privileges (e.g., ADMIN or MEMBER) and save the returned refresh token as Refresh A.
+    2. Change the user's role to a lower privilege (e.g., USER) using the OWNER account token.
+    3. Try: /refresh with Refresh A. It should fail because the user's role has been downgraded and the refresh session was revoked.
+
+#### Role Assignments and Revocation:
+    - When a user's role is changed (either upgraded or downgraded), all existing refresh sessions for that user will be revoked. 
+      This ensures that any tokens issued under the previous role are no longer valid.
+    - This is particularly important for security-sensitive operations where a user's permissions may change, 
+      and we want to ensure that they cannot continue to access resources with their old privileges.
+    - **Test role upgrade scenario**:
+    1. Log in as a user with lower privileges (e.g., USER) and save the returned refresh token as Refresh A.
+    2. Change the user's role to a higher privilege (e.g., ADMIN) using the OWNER account token.
+    3. Try: /refresh with Refresh A. It should not succeed because the user's role has been upgraded and the refresh session was revoked. 
+       This ensures that the user must log in again to obtain a new refresh token that reflects their new privileges.
+
