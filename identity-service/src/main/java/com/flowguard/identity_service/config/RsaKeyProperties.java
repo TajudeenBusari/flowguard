@@ -17,7 +17,8 @@ public record RsaKeyProperties(
         RSAPublicKey publicKey,
         RSAPrivateKey privateKey,
         String issuer,
-        Duration accessTokenExpiration
+        Duration accessTokenExpiration,
+        Duration refreshTokenExpiration
 ) {
 }
 

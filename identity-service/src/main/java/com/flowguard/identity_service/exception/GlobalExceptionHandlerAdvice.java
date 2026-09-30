@@ -85,4 +85,10 @@ public class GlobalExceptionHandlerAdvice {
   public Mono<Result> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
     return Mono.just(new Result(ex.getMessage(), false, StatusCode.CONFLICT));
   }
+
+  @ExceptionHandler(InvalidRefreshTokenException.class)
+  @ResponseStatus(HttpStatus.UNAUTHORIZED)
+  public Mono<Result> handleInvalidRefreshTokenException(InvalidRefreshTokenException ex) {
+    return Mono.just(new Result(ex.getMessage(), false, StatusCode.UNAUTHORIZED));
+  }
 }
