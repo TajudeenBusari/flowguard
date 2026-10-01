@@ -79,11 +79,4 @@ public class AuthController {
             .thenReturn(new Result("Logged out successfully", true, null, StatusCode.SUCCESS));
   }
 
-  //only used for testing purposes, can be removed in production
-//  @GetMapping("/test-me")
-//  public Mono<Result> testMe(@AuthenticationPrincipal Jwt jwt){
-//    CurrentUser currentUser = CurrentUser.fromJwt(jwt);
-//
-//    return Mono.just(new Result("Authenticated user info", true, currentUser, StatusCode.SUCCESS));
-//  }
 }

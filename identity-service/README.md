@@ -130,3 +130,15 @@ ______________________________________________________________________
     3. Try: /refresh with Refresh A. It should not succeed because the user's role has been upgraded and the refresh session was revoked. 
        This ensures that the user must log in again to obtain a new refresh token that reflects their new privileges.
 
+#### Concurrent refresh token reuse:
+    - If a user attempts to use the same refresh token concurrently from multiple clients, only the first request should succeed.
+        Request 1 ── validate A ✓ ── revoke A ── create B
+        Request 2 ── validate A ✓ ── revoke A ── create C
+        This could leave both B and C valid.
+    Subsequent requests using the same refresh token should fail, as the token would have been revoked after the first successful use.
+    - **Test concurrent refresh token reuse scenario**:
+    1. Log in and save the returned refresh token as Refresh A.
+    2. Simulate two concurrent requests to /refresh using Refresh A.
+    3. The first request should succeed and return a new access JWT and a new refresh token (Refresh B).
+    4. The second request should fail with a 401 Unauthorized response, as Refresh A has been revoked after the first request.
+
