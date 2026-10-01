@@ -22,7 +22,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
   private final RefreshTokenGenerator refreshTokenGenerator;
   private final RefreshTokenHasher refreshTokenHasher;
   private final RsaKeyProperties rsaKeyProperties;
-  private final TransactionalOperator transactionalOperator;
+  //private final TransactionalOperator transactionalOperator;
 
   /**
    * createRefreshToken(userId)
@@ -77,7 +77,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
       //System.out.println("Refresh token hash: " + tokenHash);
 
-      return refreshSessionRepository.findByTokenHash(tokenHash)
+      return refreshSessionRepository.findByTokenHashForUpdate(tokenHash)
 
               .switchIfEmpty(
                       Mono.error(new InvalidRefreshTokenException()))
@@ -115,8 +115,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
   @Override
   public Mono<String> rotateRefreshToken(RefreshSession refreshSession) {
     return revokeRefreshSession(refreshSession)
-            .then(createRefreshToken(refreshSession.getUserId()))
-            .as(transactionalOperator::transactional);
+            .then(createRefreshToken(refreshSession.getUserId()));
   }
 
   /**

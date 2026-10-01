@@ -15,6 +15,7 @@ import com.flowguard.identity_service.service.AuthService;
 import com.flowguard.identity_service.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
 import java.util.stream.Collectors;
@@ -37,6 +38,8 @@ public class AuthServiceImpl implements AuthService {
 
   private final UserRepository userRepository;
   private final UserRoleRepository userRoleRepository;
+
+  private final TransactionalOperator transactionalOperator;
 
   /**
    * LoginRequest -> AuthenticationService -> BCrypt verification
@@ -67,30 +70,79 @@ public class AuthServiceImpl implements AuthService {
   }
 
   /**
+   * Refresh token flow
    * Refresh token A
    *       ↓
-   * validate A
+   * BEGIN TRANSACTION
+   *       ↓
+   * hash refresh token A
+   *       ↓
+   * SELECT refresh session FOR UPDATE
+   *       ↓
+   * session row A is locked
+   *       ↓
+   * validate A:
+   *   - session exists
+   *   - not revoked
+   *   - not expired
    *       ↓
    * load user
    *       ↓
-   * Is user ACTIVE?  ← new check
+   * Is user ACTIVE?
    *       ↓          ↓
-   *       yes        no
-   *        ↓         ↓
-   *     roles       401
-   * load CURRENT roles
+   *      yes         no
+   *       ↓           ↓
+   * load CURRENT     401
+   * roles
    *       ↓
    * create new access JWT
+   * using current user + roles
    *       ↓
-   * transaction:
-   *    revoke A
-   *    create B
+   * rotate refresh token:
+   *   revoke session A
+   *   create session B
+   *       ↓
+   * COMMIT TRANSACTION
+   *       ↓
+   * release lock on session A
    *       ↓
    * response:
-   *    accessToken
-   *    refreshToken B
-   *    The important structural difference is that we keep everything requiring the session inside:
-   *    .flatMap(refreshSession -> ...)
+   *   accessToken
+   *   refreshToken B
+
+   * Concurrent refresh protection:
+
+   * Request 1                    Request 2
+   *     ↓                            ↓
+   * SELECT A FOR UPDATE          SELECT A FOR UPDATE
+   *     ↓                            ↓
+   * lock A                       waits for A
+   *     ↓
+   * validate A
+   *     ↓
+   * revoke A
+   * create B
+   *     ↓
+   * COMMIT
+   *     ↓
+   * release lock
+   *                                  ↓
+   *                            acquires lock
+   *                                  ↓
+   *                            sees A revoked
+   *                                  ↓
+   *                                 401
+
+   * The important structural requirement is that validation,
+   * user/role loading, and refresh-token rotation remain inside
+   * the same reactive transaction:
+
+   * .validateRefreshToken(...)
+   * .flatMap(refreshSession -> ...)
+   * .as(transactionalOperator::transactional)
+
+   * This ensures the FOR UPDATE lock remains held until the
+   * refresh-token rotation has completed and the transaction commits.
    */
   @Override
   public Mono<RefreshTokenResponse> refreshToken(RefreshTokenRequest request) {
@@ -132,7 +184,7 @@ public class AuthServiceImpl implements AuthService {
                               newRefreshToken
                       ));
                 })
-            );
+            ).as(transactionalOperator::transactional);
   }
 
   /**
