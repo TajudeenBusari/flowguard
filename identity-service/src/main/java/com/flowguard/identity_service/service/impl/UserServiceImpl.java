@@ -290,6 +290,19 @@ public class UserServiceImpl implements UserService {
             });
   }
 
+  /**
+   * BEGIN
+   *   ↓
+   * verify + encode password
+   *   ↓
+   * save new password hash
+   *   ↓
+   * revoke refresh sessions
+   *   ↓
+   * COMMIT
+   * Password save and refresh revocation are in the same transaction, so if one fails, both will roll back.
+   * That is atomicity.
+   */
   @Override
   public Mono<Void> changePassword(UUID userId, UUID organizationId, ChangePasswordRequest request) {
     return userRepository.findByIdAndOrganizationId(userId, organizationId)
@@ -314,7 +327,9 @@ public class UserServiceImpl implements UserService {
                               .revokeAllRefreshSessionsForUser(savedUser.getId())
                               .thenReturn(savedUser));
 
-            })).then();
+            }))
+            .as(transactionalOperator::transactional)
+            .then();
   }
 
   /**
@@ -333,6 +348,8 @@ public class UserServiceImpl implements UserService {
    * Throw EmailAlreadyExistsException
    *        ↓ available
    * Update email and return user
+   *        ↓
+   * revoke all refresh sessions for this user after email change, to force re-login with new email
    */
   @Override
   public Mono<User> changeEmail(UUID userId, UUID organizationId, ChangeEmailRequest request) {
@@ -361,10 +378,12 @@ public class UserServiceImpl implements UserService {
                         // else, if the email is available, we can safely update the user's email
                         user.setEmail(normalizedEmail);
                         user.setUpdatedAt(Instant.now());
-                        return userRepository.save(user);
+                        return userRepository
+                                .save(user)
+                                .flatMap(savedUser -> refreshTokenService.revokeAllRefreshSessionsForUser(savedUser.getId())
+                                        .thenReturn(savedUser));
                       });
-
-            });
+            }).as(transactionalOperator::transactional);
   }
 
 }
