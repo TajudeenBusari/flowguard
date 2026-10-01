@@ -188,22 +188,31 @@ public class AuthServiceImpl implements AuthService {
   }
 
   /**
-   * Raw refresh token
-   *       ↓
-   * hash + find session
-   *       ↓
-   * validate it
-   *       ↓
-   * revoke that specific session
-   * This logs out only that refresh session/device, not every session belonging to the user.
-   * An invalid, expired, or already-revoked refresh token will currently produce the same existing:
-   * 401 Invalid or expired refresh token
+   * Valid Refresh A
+   *     ↓
+   * logout
+   *     ↓
+   * revoke A
+   *     ↓
+   * 200
+   * Already-revoked A
+   *     ↓
+   * logout again
+   *     ↓
+   * InvalidRefreshTokenException
+   *     ↓
+   * logout converts it to completion
+   *     ↓
+   * 200
    */
   @Override
   public Mono<Void> logout(LogoutRequest request) {
     return refreshTokenService.validateRefreshToken(request.refreshToken())
             .flatMap(refreshSession ->
-                    refreshTokenService.revokeRefreshSession(refreshSession));
-    //can also be written as: refreshTokenService::revokeRefreshSession
+                    //can also be written as: refreshTokenService::revokeRefreshSession
+                    refreshTokenService.revokeRefreshSession(refreshSession))
+            .onErrorResume(InvalidRefreshTokenException.class,
+                    e -> Mono.empty());
+
   }
 }

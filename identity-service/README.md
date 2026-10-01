@@ -142,3 +142,6 @@ ______________________________________________________________________
     3. The first request should succeed and return a new access JWT and a new refresh token (Refresh B).
     4. The second request should fail with a 401 Unauthorized response, as Refresh A has been revoked after the first request.
 
+#### Logout should be made to be idempotent (producing the same result even if called multiple times):
+    - If a user logs out multiple times, the system should handle it gracefully without throwing errors.
+
