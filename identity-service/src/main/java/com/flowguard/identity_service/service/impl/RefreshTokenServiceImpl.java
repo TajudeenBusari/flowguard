@@ -143,4 +143,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     });
   }
 
+  /**
+   * cutoff
+   *    ↓
+   * DELETE sessions where expires_at < cutoff
+   *    ↓
+   * return number deleted
+   */
+  @Override
+  public Mono<Long> cleanupExpiredRefreshSessions(Instant cutoff) {
+    return refreshSessionRepository.deleteByExpiresAtBefore(cutoff);
+  }
+
 }

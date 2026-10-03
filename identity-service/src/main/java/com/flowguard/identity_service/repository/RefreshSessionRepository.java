@@ -6,6 +6,7 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public interface RefreshSessionRepository extends ReactiveCrudRepository<RefreshSession, UUID> {
@@ -25,4 +26,7 @@ public interface RefreshSessionRepository extends ReactiveCrudRepository<Refresh
     FOR UPDATE
     """)
   Mono<RefreshSession> findByTokenHashForUpdate(String tokenHash);
+
+  //delete all refresh sessions that have expired before the given cutoff instant
+  Mono<Long> deleteByExpiresAtBefore(Instant cutoff);
 }
