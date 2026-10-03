@@ -3,6 +3,7 @@ package com.flowguard.identity_service.service;
 import com.flowguard.identity_service.entity.RefreshSession;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -55,4 +56,6 @@ public interface RefreshTokenService {
    * save them
    */
   Mono<Void> revokeAllRefreshSessionsForUser(UUID userId);
+
+  Mono<Long> cleanupExpiredRefreshSessions(Instant cutoff);
 }

@@ -28,6 +28,9 @@ security:
     issuer: flowguard-identity-service
     access-token-expiration: 15m
     refresh-token-expiration: 7d
+  refresh-session:
+    cleanup-cron: "0 0 3 * * *"
+#      cleanup-cron: "0 * * * * *" # for testing 0 of every minute
 
 logging:
   level:
