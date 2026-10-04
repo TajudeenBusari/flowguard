@@ -53,7 +53,6 @@ public class JwtTokenService {
    * and organizationId is embedded in the signed token so downstream services
    * can derive tenant ownership from the authenticated identity
    * instead of trusting an organization ID supplied by the client.
-
    */
   public String createToken(FlowGuardPrincipal principal) {
 
@@ -74,7 +73,9 @@ public class JwtTokenService {
             .claim("email", user.getEmail())
             .claim("roles", principal.getRoles().stream().map(Role::name).toList())
             .build();
-    JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
+    JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256)
+            .keyId("flowguard-identity-key") // gives the JWTs a key ID so that downstream services can retrieve the public key from the JWK Set endpoint
+            .build();
 
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 

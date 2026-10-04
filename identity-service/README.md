@@ -145,3 +145,15 @@ ______________________________________________________________________
 #### Logout should be made to be idempotent (producing the same result even if called multiple times):
     - If a user logs out multiple times, the system should handle it gracefully without throwing errors.
 
+#### you can decode the JWT Token in the PowerShell without posting the token anywhere 
+    1. first assign the token variable $token = "YOUR_ACCESS_TOKEN"
+    2. then run: $header=$token.Split('.')[0]; $header += "=" * ((4 - $header.Length % 4) % 4); [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($header.Replace('-', '+').Replace('_', '/')))
+   
+
+#### Kid must be the same in the Signing JWK, JWT header, and Public JWKS.
+    Signing JWK     kid = flowguard-identity-key
+    ↓
+    JWT header      kid = flowguard-identity-key
+    ↓
+    Public JWKS     kid = flowguard-identity-key
+
