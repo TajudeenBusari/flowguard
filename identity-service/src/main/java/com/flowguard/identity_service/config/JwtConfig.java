@@ -18,6 +18,7 @@ public class JwtConfig {
   public JwtEncoder jwtEncoder(RsaKeyProperties rsaKeyProperties) {
     RSAKey rsaKey = new RSAKey.Builder(rsaKeyProperties.publicKey())
             .privateKey(rsaKeyProperties.privateKey())
+            .keyID("flowguard-identity-key")
             .build();
     var jwkSource = new ImmutableJWKSet<>(new JWKSet(rsaKey));
     return new NimbusJwtEncoder(jwkSource);

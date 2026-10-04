@@ -61,12 +61,20 @@ public class SecurityConfiguration {
             .authorizeExchange(exchanges -> exchanges
                     .pathMatchers(HttpMethod.POST, baseUrl + "/auth/login").permitAll()
                     .pathMatchers(HttpMethod.POST, baseUrl + "/auth/refresh").permitAll()
+                    .pathMatchers(HttpMethod.GET, "/oauth2/jwks").permitAll()
 
                     //Why permitAll()? The access JWT might already be expired when the client wants to log out.
-                    // The refresh token is the credential being revoked, so requiring a valid access JWT would unnecessarily prevent logout in that situation.
+                    // The refresh token is the credential being revoked, so requiring a valid access JWT
+                    // would unnecessarily prevent logout in that situation.
                     .pathMatchers(HttpMethod.POST, baseUrl + "/auth/logout").permitAll()
 
+                    // For now, we have not decided whether FlowGuard uses self-service organization sign up or platform-controlled
+                    // tenant provisioning.
+                    // If it is self-service, then permitAll() makes sense for now but should have abuse protections.
+                    // If it is platform-controlled, then this endpoint should be restricted to something like
+                    // PLATFORM_ADMIN admins and not permitAll().
                     .pathMatchers(HttpMethod.POST, baseUrl + "/organizations" ).permitAll()
+
                     .pathMatchers(HttpMethod.POST, baseUrl + "/organizations/users").hasRole("OWNER")
                     .pathMatchers(HttpMethod.GET, baseUrl + "/organizations/users").hasAnyRole("OWNER", "ADMIN")
                     .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/*/roles").hasRole("OWNER")
@@ -75,8 +83,7 @@ public class SecurityConfiguration {
                     .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/me/profile").authenticated()
                     .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/me/password").authenticated()
                     .pathMatchers(HttpMethod.PUT, baseUrl + "/organizations/users/me/email").authenticated()
-                    .anyExchange()
-                    .authenticated()
+                    .anyExchange().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                     jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
