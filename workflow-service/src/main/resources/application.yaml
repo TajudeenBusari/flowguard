@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: workflow-service
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5434/flowguard_workflow
+    username: flowguard
+    password: flowguard
+
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://localhost:5434/flowguard_workflow
+    user: flowguard
+    password: flowguard
+    locations: classpath:db/migration
+
+server:
+  port: 8082
+
+security:
+  jwt:
+    issuer: flowguard-identity-service
+    jwk-set-uri: http://localhost:8081/oauth2/jwks

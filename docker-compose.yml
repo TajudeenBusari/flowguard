@@ -15,10 +15,26 @@ services:
     networks:
       - spring-boot-network
 
+  workflow-postgres:
+    image: postgres:18
+    container_name: flowguard-workflow-postgres
+
+    environment:
+      POSTGRES_DB: flowguard_workflow
+      POSTGRES_USER: flowguard
+      POSTGRES_PASSWORD: flowguard
+
+    ports:
+      - "5434:5432"
+    volumes:
+      - workflow-postgres-data:/var/lib/postgresql
+    networks:
+      - spring-boot-network
 
 networks:
   spring-boot-network:
     driver: bridge
 volumes:
   identity-postgres-data:
+  workflow-postgres-data:
 
