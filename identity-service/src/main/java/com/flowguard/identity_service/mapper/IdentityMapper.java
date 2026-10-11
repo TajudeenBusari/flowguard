@@ -8,7 +8,12 @@ import com.flowguard.identity_service.entity.User;
 
 import java.util.Set;
 
-public class IdentityMapper {
+//final → don't extend this utility class.
+public final class IdentityMapper {
+
+  //private IdentityMapper() → don't instantiate it.
+  private IdentityMapper() {}
+
   public static OrganizationResponseDto mapFromOrganizationToOrganizationResponseDto(Organization organization) {
     return new OrganizationResponseDto(
             organization.getId(),

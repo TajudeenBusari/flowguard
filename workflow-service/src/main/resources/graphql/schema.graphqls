@@ -1,0 +1,58 @@
+type Query{
+    workflows: [Workflow!]
+    workflowVersions(workflowId: ID!): [WorkflowVersion!]!
+    workflowSteps(workflowVersionId: ID!): [WorkflowStep!]!
+}
+
+type Mutation{
+    createWorkflow(input: CreateWorkflowInput!): Workflow!
+    addStepToWorkflow(workflowId: ID!, input: CreateWorkflowStepInput!): WorkflowStep!
+    publishWorkflow(workflowId: ID!): WorkflowVersion!
+    createDraftVersion(workflowId: ID!): WorkflowVersion!
+}
+
+
+type Workflow {
+    id: ID!
+    name: String!
+    description: String
+    createdAt: String!
+    updatedAt: String!
+}
+
+input CreateWorkflowInput{
+    name: String!
+    description: String
+}
+
+input CreateWorkflowStepInput{
+    name: String!
+}
+
+enum WorkflowVersionStatus{
+    DRAFT
+    PUBLISHED
+    RETIRED
+}
+
+enum WorkflowStepType{
+    TASK
+}
+
+type WorkflowStep{
+    id: ID!
+    name: String!
+    type: WorkflowStepType!
+    position: Int!
+    createdAt: String!
+    updatedAt: String!
+}
+
+type WorkflowVersion{
+    id: ID!
+    workflowId: ID!
+    version: Int!
+    status: WorkflowVersionStatus!
+    createdAt: String!
+    updatedAt: String!
+}
